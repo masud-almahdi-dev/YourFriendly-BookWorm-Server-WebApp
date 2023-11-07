@@ -17,11 +17,20 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    //await client.connect();
     app.get('/', async(req, res) => {
       await client.db("admin").command({ ping: 1 });
       res.send("Pinged your deployment. You successfully connected to MongoDB!");
     })
+    const users = client.db('BookWormDB').collection('users');
+    const books = client.db('BookWormDB').collection('books');
+    const categories = client.db('BookWormDB').collection('categories');
+
+    app.get('/categories', async(req, res) => {
+      const cursor = categories.find();
+      const result = await cursor.toArray();
+      res.send(result)
+    })
+    
   } finally {
   }
 }
