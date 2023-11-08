@@ -48,6 +48,15 @@ async function run() {
                 res.send(e)
             }
         })
+        app.get('/book/:id', async (req, res) => {
+            try {
+                let id = new ObjectId(req.params.id)
+                let result = await books.findOne(id)
+                res.send(result)
+            } catch (e) {
+                res.send(e)
+            }
+        })
 
 
 
