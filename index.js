@@ -57,7 +57,49 @@ async function run() {
                 res.send(e)
             }
         })
+        app.post('/add', async (req, res) => {
+            try {
+                let result = await books.insertOne(req.body)
+                res.send(result)
+            } catch (e) {
+                res.send(e)
+            }
+        })
+        app.patch('/update/:id', async (req, res) => {
+            try {
+                let id = new ObjectId(req.params.id)
+                const filter = { _id: id }
+                const options = { upsert: true }
+                const updated = {
+                  $set: {
+                    name: req.body.name,
+                    picture: req.body.picture,
+                    author: req.body.author,
+                    category: req.body.category,
+                    quantity: req.body.quantity,
+                    rating: req.body.rating,
+                    quantity: req.body.quantity
+                  }
+                }
+                const result = await books.updateOne(filter, updated, options)
+                res.send(result)
+            } catch (e) {
+                res.send(e)
+            }
+        })
 
+        app.delete("/delete/:id", async (req, res) => {
+
+            try {
+              let id = new ObjectId(req.params.id)
+              const filter = { _id: id }
+              const result = await books.deleteOne(filter)
+              res.send(result)
+            } catch (e) {
+              res.send(e)
+            }
+          })
+      
 
 
     } finally {
