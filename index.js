@@ -71,15 +71,15 @@ async function run() {
                 const filter = { _id: id }
                 const options = { upsert: true }
                 const updated = {
-                  $set: {
-                    name: req.body.name,
-                    picture: req.body.picture,
-                    author: req.body.author,
-                    category: req.body.category,
-                    quantity: req.body.quantity,
-                    rating: req.body.rating,
-                    quantity: req.body.quantity
-                  }
+                    $set: {
+                        name: req.body.name,
+                        picture: req.body.picture,
+                        author: req.body.author,
+                        category: req.body.category,
+                        quantity: req.body.quantity,
+                        rating: req.body.rating,
+                        quantity: req.body.quantity
+                    }
                 }
                 const result = await books.updateOne(filter, updated, options)
                 res.send(result)
@@ -91,16 +91,92 @@ async function run() {
         app.delete("/delete/:id", async (req, res) => {
 
             try {
-              let id = new ObjectId(req.params.id)
-              const filter = { _id: id }
-              const result = await books.deleteOne(filter)
-              res.send(result)
+                let id = new ObjectId(req.params.id)
+                const filter = { _id: id }
+                const result = await books.deleteOne(filter)
+                res.send(result)
             } catch (e) {
-              res.send(e)
+                res.send(e)
             }
-          })
-      
+        })
+        app.patch('/borrow/:id', async (req, res) => {
+            try {
+                let id = new ObjectId(req.params.id)
+                let bbook = await books.findOne(id)
+                if(bbook.quantity<=0){
+                    res.send({code:"50"}) 
+                }else{
 
+                    const filter = { _id: id }
+                    const options = { upsert: true }
+                    const updated = {
+                        $set: {
+                            name: bbook.name,
+                            picture: bbook.picture,
+                            author: bbook.author,
+                            category: bbook.category,
+                            quantity: bbook.quantity,
+                            rating: bbook.rating,
+                            quantity: (bbook.quantity-1)
+                        }
+                    }
+                    const result = await books.updateOne(filter, updated, options)
+                    res.send(result)
+                }
+            } catch (e) {
+                res.send(e)
+            }
+        })
+
+        app.patch('/content/:id', async (req, res) => {
+            try {
+                let id = new ObjectId(req.params.id)
+                let bbook = await books.findOne(id)
+                const filter = { _id: id }
+                const options = { upsert: true }
+                const updated = {
+                    $set: {
+                        name: bbook.name,
+                        picture: bbook.picture,
+                        author: bbook.author,
+                        category: bbook.category,
+                        quantity: bbook.quantity,
+                        rating: bbook.rating,
+                        quantity: bbook.quantity,
+                        read: req.body.content
+                    }
+                }
+                const result = await books.updateOne(filter, updated, options)
+                res.send(result)
+            } catch (e) {
+                res.send(e)
+            }
+        })
+
+        app.get('/user', async (req, res) => {
+            try {
+                console.log(req.body.email)
+                const filter = { email: req.body.email }
+                let user = await users.findOne(filter)
+                res.send(user)
+            } catch (e) {
+                res.send(e)
+            }
+        })
+        app.post('/usercreate', async (req, res) => {
+            try {
+                const user = { email: req.body.email,
+                    Name: req.body.name,
+                    picture: req.body.picture,
+                    books: {}
+                }
+                let result = await users.insertOne(user)
+                res.send(result)
+            } catch (e) {
+                res.send(e)
+            }
+        })
+        
 
     } finally {
     }
