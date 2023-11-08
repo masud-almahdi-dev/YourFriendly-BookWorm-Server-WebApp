@@ -5,7 +5,7 @@ const port = process.env.PORT || 5000
 app.use(cors());
 app.use(express.json());
 require('dotenv').config()
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
     serverApi: {
@@ -36,6 +36,20 @@ async function run() {
             const result = await cursor.toArray();
             res.send(result)
         })
+        app.get('/category/:id', async (req, res) => {
+            try {
+                let id = new ObjectId(req.params.id)
+                let category = await categories.findOne(id)
+                const cursor = books.find({ category: category.title });
+                let result = await cursor.toArray();
+                category.items = result
+                res.send(category)
+            } catch (e) {
+                res.send(e)
+            }
+        })
+
+
 
     } finally {
     }
