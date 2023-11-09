@@ -25,6 +25,7 @@ const client = new MongoClient(uri, {
 
 const verifyToken = async (req, res, next) => {
     const token = req.cookies?.token;
+    
     if (!token) {
         return res.status(401).send({ message: 'not authorized' })
         next()
@@ -139,8 +140,27 @@ async function run() {
                     const userupdate = {$push:{books:req.params.id}}
                     const result1 = await books.updateOne(filter, updated, options)
                     const result2 = await users.updateOne(userfilter, userupdate,options)
-                    console.log("updated")
-                    res.send(result2)
+                    res.send(result1)
+                }
+            } catch (e) {
+                res.send(e)
+            }
+        })
+        app.patch('/return/:id',verifyToken, async (req, res) => {
+            try {
+                const id = new ObjectId(req.params.id)
+                const bbook = await books.findOne(id)
+                const userfilter = {email : req.user.email}
+                const uuser = await users.findOne(userfilter)
+                if(uuser.books.includes(req.params.id)){
+                    const filter = { _id: id }
+                    const updated = {$set: {quantity: (bbook.quantity + 1)}}
+                    const userupdate = {$pull:{books:req.params.id}}
+                    const result1 = await books.updateOne(filter, updated, { upsert: true })
+                    const result2 = await users.findOneAndUpdate(userfilter, userupdate,{new:true})
+                    res.send(result1)
+                }else{
+                    res.send({ code: "50", message: "You dont have the book." })
                 }
             } catch (e) {
                 res.send(e)
@@ -162,9 +182,9 @@ async function run() {
 
         app.get('/user', verifyToken , async (req, res) => {
             try {
-                const filter = { email: req.user.email }
-                let user = await users.findOne(filter)
-                res.send(user)
+                const userfilter = {email : req.user.email}
+                const uuser = await users.findOne(userfilter)
+                res.send(uuser)
             } catch (e) {
                 res.send(e)
             }
@@ -175,6 +195,7 @@ async function run() {
                     email: req.body.email,
                     name: req.body.name,
                     picture: req.body.picture,
+                    role: "client",
                     books: []
                 }
                 let result = await users.insertOne(user)
@@ -186,7 +207,7 @@ async function run() {
 
         app.post('/jwt', async (req, res) => {
             const user = req.body
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '288h' })
             res.cookie('token', token, {
                 maxAge: 1000 * 3600 * 72 * 4,
                 httpOnly: true,
