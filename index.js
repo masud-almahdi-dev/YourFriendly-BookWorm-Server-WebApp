@@ -1,10 +1,18 @@
 const express = require('express')
 const cors = require('cors')
+const cookieParser = require('cookie-parser')
+const jwt = require('jsonwebtoken')
 const app = express()
-const port = process.env.PORT || 5000
-app.use(cors());
-app.use(express.json());
 require('dotenv').config()
+
+const port = process.env.PORT || 5000
+app.use(cors({
+    origin: [process.env.LIVE_LINK],
+    credentials: true
+}));
+
+app.use(cookieParser());
+app.use(express.json());
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
@@ -15,6 +23,20 @@ const client = new MongoClient(uri, {
     }
 });
 
+const verifyToken = async (req, res, next) => {
+    const token = req.cookies?.token;
+    if (!token) {
+        return res.status(401).send({ message: 'not authorized' })
+        next()
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ message: 'unauthorized' })
+        }
+        req.user = decoded
+        next()
+    })
+}
 async function run() {
     try {
         app.get('/', async (req, res) => {
@@ -99,29 +121,26 @@ async function run() {
                 res.send(e)
             }
         })
-        app.patch('/borrow/:id', async (req, res) => {
+        app.patch('/borrow/:id',verifyToken, async (req, res) => {
             try {
                 let id = new ObjectId(req.params.id)
                 let bbook = await books.findOne(id)
-                if(bbook.quantity<=0){
-                    res.send({code:"50"}) 
-                }else{
+                let userfilter = {email : req.user.email}
+                let uuser = await users.findOne(userfilter)
 
+                if (bbook.quantity <= 0) {
+                    res.send({ code: "50", message: "No more books available right now" })
+                }else if(uuser.books.includes(req.params.id)){
+                    res.send({ code: "50", message: "You have already borrowed this book." })
+                }else{
                     const filter = { _id: id }
                     const options = { upsert: true }
-                    const updated = {
-                        $set: {
-                            name: bbook.name,
-                            picture: bbook.picture,
-                            author: bbook.author,
-                            category: bbook.category,
-                            quantity: bbook.quantity,
-                            rating: bbook.rating,
-                            quantity: (bbook.quantity-1)
-                        }
-                    }
-                    const result = await books.updateOne(filter, updated, options)
-                    res.send(result)
+                    const updated = {$set: {quantity: (bbook.quantity - 1)}}
+                    const userupdate = {$push:{books:req.params.id}}
+                    const result1 = await books.updateOne(filter, updated, options)
+                    const result2 = await users.updateOne(userfilter, userupdate,options)
+                    console.log("updated")
+                    res.send(result2)
                 }
             } catch (e) {
                 res.send(e)
@@ -131,21 +150,9 @@ async function run() {
         app.patch('/content/:id', async (req, res) => {
             try {
                 let id = new ObjectId(req.params.id)
-                let bbook = await books.findOne(id)
                 const filter = { _id: id }
                 const options = { upsert: true }
-                const updated = {
-                    $set: {
-                        name: bbook.name,
-                        picture: bbook.picture,
-                        author: bbook.author,
-                        category: bbook.category,
-                        quantity: bbook.quantity,
-                        rating: bbook.rating,
-                        quantity: bbook.quantity,
-                        read: req.body.content
-                    }
-                }
+                const updated = { $set: { read: req.body.content } } 
                 const result = await books.updateOne(filter, updated, options)
                 res.send(result)
             } catch (e) {
@@ -153,10 +160,9 @@ async function run() {
             }
         })
 
-        app.get('/user', async (req, res) => {
+        app.get('/user', verifyToken , async (req, res) => {
             try {
-                console.log(req.body.email)
-                const filter = { email: req.body.email }
+                const filter = { email: req.user.email }
                 let user = await users.findOne(filter)
                 res.send(user)
             } catch (e) {
@@ -165,10 +171,11 @@ async function run() {
         })
         app.post('/usercreate', async (req, res) => {
             try {
-                const user = { email: req.body.email,
-                    Name: req.body.name,
+                const user = {
+                    email: req.body.email,
+                    name: req.body.name,
                     picture: req.body.picture,
-                    books: {}
+                    books: []
                 }
                 let result = await users.insertOne(user)
                 res.send(result)
@@ -176,7 +183,17 @@ async function run() {
                 res.send(e)
             }
         })
-        
+
+        app.post('/jwt', async (req, res) => {
+            const user = req.body
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.cookie('token', token, {
+                maxAge: 1000 * 3600 * 72 * 4,
+                httpOnly: true,
+                secure: false //change before deploy
+            })
+            res.send({ success: true })
+        })
 
     } finally {
     }
